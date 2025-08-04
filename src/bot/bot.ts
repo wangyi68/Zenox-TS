@@ -14,6 +14,7 @@ import { Config } from '../db/structures';
 import { AppCommandTranslator } from '../l10n';
 import { readdirSync } from 'fs';
 import { join } from 'path';
+import { log } from '../utils/logger';
 
 export class Zenox extends Client {
   owner_id: number;
@@ -61,25 +62,38 @@ export class Zenox extends Client {
 
   private setupEventHandlers(): void {
     this.on('ready', () => {
-      console.log(`Logged in as ${this.user?.tag}`);
+      log.success(`Bot client ready - Logged in as ${this.user?.tag}`);
     });
 
     this.on('error', (error) => {
-      console.error('Bot error:', error);
+      log.error('Bot client error', error);
       this.captureException(error);
+    });
+
+    this.on('warn', (warning) => {
+      log.warn(`Bot client warning: ${warning}`);
+    });
+
+    this.on('debug', (message) => {
+      log.debug(`Bot client debug: ${message}`);
     });
   }
 
   async setupHook(): Promise<void> {
+    log.info('Setting up bot hook...');
+    
     // Set Translator
     // Note: Discord.js v14 doesn't have built-in translator like discord.py
     // You might need to implement your own translation system
+    log.debug('Translator setup skipped (not implemented in Discord.js)');
 
     // Load Cogs
     const cogsPath = join(__dirname, '../cogs');
     try {
       const cogFiles = readdirSync(cogsPath).filter(file => file.endsWith('.js'));
+      log.info(`Found ${cogFiles.length} cog files to load`);
       
+      let loadedCogs = 0;
       for (const file of cogFiles) {
         const cogName = file.replace('.js', '');
         try {
@@ -87,14 +101,22 @@ export class Zenox extends Client {
           if (cog.default) {
             const cogInstance = new cog.default(this);
             this.commands.set(cogInstance.name, cogInstance);
+            loadedCogs++;
+            log.success(`Loaded cog: ${cogName}`);
           }
         } catch (error) {
-          console.error(`Failed to load cog ${cogName}:`, error);
+          log.error(`Failed to load cog ${cogName}`, error);
           this.captureException(error as Error);
         }
       }
+      
+      log.table('Cog Loading Results', {
+        'Total Files': cogFiles.length,
+        'Successfully Loaded': loadedCogs,
+        'Failed': cogFiles.length - loadedCogs
+      });
     } catch (error) {
-      console.error('Error loading cogs:', error);
+      log.error('Error loading cogs', error);
     }
 
     // Register commands
@@ -108,27 +130,35 @@ export class Zenox extends Client {
     const commands = Array.from(this.commands.values()).map(cmd => cmd.data);
 
     try {
-      console.log('Started refreshing application (/) commands.');
+      log.info(`Started refreshing ${commands.length} application (/) commands...`);
 
       await rest.put(
         Routes.applicationCommands(this.user.id),
         { body: commands }
       );
 
-      console.log('Successfully reloaded application (/) commands.');
+      log.success(`Successfully registered ${commands.length} application commands`);
+      
+      if (commands.length > 0) {
+        log.table('Registered Commands', {
+          'Total Commands': commands.length,
+          'Global Commands': commands.filter(cmd => !cmd.guild_id).length,
+          'Guild Commands': commands.filter(cmd => cmd.guild_id).length
+        });
+      }
     } catch (error) {
-      console.error('Error registering commands:', error);
+      log.error('Error registering commands', error);
     }
   }
 
   captureException(e: Error): void {
-    // Implement Sentry or other error tracking here
-    console.error('Captured exception:', e);
-    
     // Filter out specific errors if needed
     if (e.message.includes('10062')) {
+      log.debug('Ignoring error 10062 (known Discord API issue)');
       return;
     }
+    
+    log.error('Captured exception in bot', e);
     
     // You can integrate with Sentry here
     // Sentry.captureException(e);
