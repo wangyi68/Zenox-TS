@@ -1,0 +1,16 @@
+aiohttp==3.11.9
+discord.py==2.5.2
+enka==2.4.4
+genshin==1.7.7
+GitPython==3.1.43
+loguru==0.7.2
+pandas==2.2.3
+psutil==6.1.0
+pymongo==4.9.2
+python-dotenv==1.1.0
+python_dateutil==2.9.0.post0
+pytz==2025.2
+PyYAML==6.0.1
+requests==2.31.0
+sentry-sdk==2.15.0
+prometheus-client==0.21.1
